@@ -1,28 +1,32 @@
 // GDGRAPX-Class_Activity.cpp : This file contains the 'main' function. Program execution begins and ends there.
 
 #define _USE_MATH_DEFINES
+#define TINYOBJLOADER_IMPLEMENTATION
 
+#include "tiny_obj_loader.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <cmath>
-
-#define TINYOBJLOADER_IMPLEMENTATION
-#include "tiny_obj_loader.h"
-
-#include<string>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <string>
 #include <iostream>
-
-
-float DegToRad(float degrees)
-{
-    return (degrees * (M_PI / 180));
-}
+#include <cmath>
 
 
 float x_mod = 0;
 float y_mod = 0;
+float theta = 0;
+float gamma = 0;
+float beta = 0;
+bool right = true;
+bool up = true;
+bool forward = true;
+glm::mat3 identity_matrix3 = glm::mat3(1.0f);
+glm::mat4 identity_matrix4 = glm::mat4(1.0f);
 
-void Key_Callback(GLFWwindow* window, int key, int scancode, int action, int mod)
+
+void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 {
     if (key == GLFW_KEY_D && action == GLFW_PRESS)
     {
@@ -43,7 +47,41 @@ void Key_Callback(GLFWwindow* window, int key, int scancode, int action, int mod
     {
         y_mod -= 0.1f;
     }
+
+    if (key == GLFW_KEY_R && action == GLFW_PRESS)
+    {
+        right = !right;
+    }
+
+    if (key == GLFW_KEY_T && action == GLFW_PRESS)
+    {
+        up = !up;
+    }
+
+    if (key == GLFW_KEY_Y && action == GLFW_PRESS)
+    {
+        forward = !forward;
+    }
 }
+
+std::string GetShaderData(std::string path)
+{
+    std::fstream src(path);
+    std::stringstream buffer;
+    buffer << src.rdbuf();
+
+    return buffer.str();
+}
+
+GLuint CreateAndCompileShader(int shaderType, const char* data)
+{
+    GLuint shader = glCreateShader(shaderType);
+    glShaderSource(shader, 1, &data, NULL);
+    glCompileShader(shader);
+
+    return shader;
+}
+
 
 int main(void)
 {
@@ -64,38 +102,28 @@ int main(void)
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
     gladLoadGL();
-    glfwSetKeyCallback(window, Key_Callback);
+    glfwSetKeyCallback(window, KeyCallback);
 
 
-    std::fstream vertSrc("Shaders/sample.vert");
-    std::stringstream vertBuff;
-    vertBuff << vertSrc.rdbuf();
-
-    std::string vertS = vertBuff.str();
+    // Load shader files
+    std::string vertS = GetShaderData("Shaders/sample.vert");
     const char* v = vertS.c_str();
 
-    std::fstream fragSrc("Shaders/sample.frag");
-    std::stringstream fragBuff;
-    fragBuff << fragSrc.rdbuf();
-
-    std::string fragS = fragBuff.str();
+    std::string fragS = GetShaderData("Shaders/sample.frag");;
     const char* f = fragS.c_str();
 
 
-    GLuint vertShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertShader, 1, &v, NULL);
-    glCompileShader(vertShader);
-
-    GLuint fragShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragShader, 1, &f, NULL);
-    glCompileShader(fragShader);
-
+    // Create and compile shaders
+    GLuint vertShader = CreateAndCompileShader(GL_VERTEX_SHADER, v);
+    GLuint fragShader = CreateAndCompileShader(GL_FRAGMENT_SHADER, f);
+    
     GLuint shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertShader);
     glAttachShader(shaderProgram, fragShader);
     glLinkProgram(shaderProgram);
 
 
+    // Load 3d object
     tinyobj::attrib_t attributes;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -111,6 +139,7 @@ int main(void)
     }
 
 
+    // define vertices and indices of triangle
     GLfloat vertices[]
     {
         0.f, 0.5f, 0.f,
@@ -123,6 +152,7 @@ int main(void)
         0, 1, 2
     };
 
+    // Declare buffer objects
     GLuint VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -158,11 +188,30 @@ int main(void)
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
+        float tX = 0.3f, tY = 0.6f, tZ = -0.2f;
+        float sX = 2.f, sY = 2.f, sZ = 2.f;
+        float rX = 0, rY = 1, rZ = 0;
+
+        theta += right ? 2 : -2;
+        gamma += up ? 1 : -1;
+        //beta += forward ? 1.5f : -1.5f;
+
+        glm::mat4 transformation_matrix = glm::mat4(1.0f);
+        transformation_matrix = glm::translate(transformation_matrix, glm::vec3(tX, tY, tZ));
+        transformation_matrix = glm::scale(transformation_matrix, glm::vec3(sX, sY, sZ));
+        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(theta), glm::normalize(glm::vec3(0, 1, 0)));
+        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(gamma), glm::normalize(glm::vec3(1, 0, 0)));
+        //transformation_matrix = glm::rotate(transformation_matrix, glm::radians(beta), glm::normalize(glm::vec3(0, 0, 1)));
+
+
         unsigned int xLoc = glGetUniformLocation(shaderProgram, "x");
         glUniform1f(xLoc, x_mod);
 
         unsigned int yLoc = glGetUniformLocation(shaderProgram, "y");
         glUniform1f(yLoc, y_mod);
+
+        unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
 
 
         glUseProgram(shaderProgram);
