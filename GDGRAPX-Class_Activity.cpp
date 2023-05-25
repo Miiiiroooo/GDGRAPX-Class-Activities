@@ -13,39 +13,88 @@
 #include <iostream>
 #include <cmath>
 
+float width = 640;
+float height = 640;
 
 float x_mod = 0;
 float y_mod = 0;
+float z_mod = 0;
+float scale = 1;
+
 float theta = 0;
 float gamma = 0;
 float beta = 0;
 bool right = true;
 bool up = true;
 bool forward = true;
+
+float fov = 60.f;
 glm::mat3 identity_matrix3 = glm::mat3(1.0f);
 glm::mat4 identity_matrix4 = glm::mat4(1.0f);
+glm::mat4 orthoProjection = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, -1.0f, 1.0f); 
+glm::mat4 perspectiveProjection = glm::perspective(glm::radians(fov), height / width, 0.1f, 100.f);
 
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 {
-    if (key == GLFW_KEY_D && action == GLFW_PRESS)
+    if (key == GLFW_KEY_D && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
         x_mod += 0.1f;
     }
     
-    if (key == GLFW_KEY_A && action == GLFW_PRESS)
+    if (key == GLFW_KEY_A && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
         x_mod -= 0.1f;
     }
 
-    if (key == GLFW_KEY_W && action == GLFW_PRESS)
+    if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
         y_mod += 0.1f;
     }
 
-    if (key == GLFW_KEY_S && action == GLFW_PRESS)
+    if (key == GLFW_KEY_S && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
         y_mod -= 0.1f;
+    }
+
+    if (key == GLFW_KEY_Q && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        scale -= 0.1f;
+    }
+
+    if (key == GLFW_KEY_E && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        scale += 0.1f;
+    }
+
+    if (key == GLFW_KEY_Z && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        fov -= 1.f;
+    }
+
+    if (key == GLFW_KEY_X && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        fov += 1.f;
+    }
+
+    if (key == GLFW_KEY_LEFT && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        theta -= 5.f;
+    }
+
+    if (key == GLFW_KEY_RIGHT && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        theta += 5.f;
+    }
+
+    if (key == GLFW_KEY_UP && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        gamma -= 5.f;
+    }
+
+    if (key == GLFW_KEY_DOWN && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        gamma += 5.f;
     }
 
     if (key == GLFW_KEY_R && action == GLFW_PRESS)
@@ -82,6 +131,12 @@ GLuint CreateAndCompileShader(int shaderType, const char* data)
     return shader;
 }
 
+void LoadObject(tinyobj::attrib_t& attributes, std::vector<tinyobj::shape_t>& shapes, std::vector<tinyobj::material_t>& materials, std::string path)
+{
+    std::string warning, error;
+
+    bool success = tinyobj::LoadObj(&attributes, &shapes, &materials, &warning, &error, path.c_str());
+}
 
 int main(void)
 {
@@ -92,7 +147,7 @@ int main(void)
         return -1;
 
 
-    window = glfwCreateWindow(640, 640, "Aamir Akim", NULL, NULL);
+    window = glfwCreateWindow(width, height, "Aamir Akim", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -102,6 +157,7 @@ int main(void)
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
     gladLoadGL();
+    glViewport(0, 0, width, height);
     glfwSetKeyCallback(window, KeyCallback);
 
 
@@ -127,15 +183,12 @@ int main(void)
     tinyobj::attrib_t attributes;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
-    std::string warning, error;
-    std::string path = "3D/bunny.obj";
-
-    bool success = tinyobj::LoadObj(&attributes, &shapes, &materials, &warning, &error, path.c_str());
+    LoadObject(attributes, shapes, materials, "3D/bunny.obj");
 
     std::vector<GLuint> mesh_indices;
-    for (int i = 0; i < shapes[0].mesh.indices.size(); i++)
+    for (auto index : shapes[0].mesh.indices)
     {
-        mesh_indices.push_back(shapes[0].mesh.indices[i].vertex_index);
+        mesh_indices.push_back(index.vertex_index);
     }
 
 
@@ -158,6 +211,7 @@ int main(void)
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
 
+    // Setup the buffer objects
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, 
@@ -176,7 +230,7 @@ int main(void)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                  sizeof(GLuint) * mesh_indices.size(),
-        mesh_indices.data(),
+                 mesh_indices.data(),
                  GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -188,12 +242,12 @@ int main(void)
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
-        float tX = 0.3f, tY = 0.6f, tZ = -0.2f;
-        float sX = 2.f, sY = 2.f, sZ = 2.f;
+        float tX = 0.3f, tY = 0.6f, tZ = -5.0f;
+        float sX = scale, sY = scale, sZ = scale;
         float rX = 0, rY = 1, rZ = 0;
 
-        theta += right ? 2 : -2;
-        gamma += up ? 1 : -1;
+        //theta += right ? 2 : -2;
+        //gamma += up ? 1 : -1;
         //beta += forward ? 1.5f : -1.5f;
 
         glm::mat4 transformation_matrix = glm::mat4(1.0f);
@@ -203,6 +257,7 @@ int main(void)
         transformation_matrix = glm::rotate(transformation_matrix, glm::radians(gamma), glm::normalize(glm::vec3(1, 0, 0)));
         //transformation_matrix = glm::rotate(transformation_matrix, glm::radians(beta), glm::normalize(glm::vec3(0, 0, 1)));
 
+        perspectiveProjection = glm::perspective(glm::radians(fov), height / width, 0.1f, 100.f);
 
         unsigned int xLoc = glGetUniformLocation(shaderProgram, "x");
         glUniform1f(xLoc, x_mod);
@@ -210,8 +265,14 @@ int main(void)
         unsigned int yLoc = glGetUniformLocation(shaderProgram, "y");
         glUniform1f(yLoc, y_mod);
 
+        unsigned int zLoc = glGetUniformLocation(shaderProgram, "z");
+        glUniform1f(zLoc, z_mod);
+
         unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
+
+        unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
 
 
         glUseProgram(shaderProgram);
