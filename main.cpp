@@ -279,23 +279,48 @@ int main(void)
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
+        // camera
+        glm::vec3 camPos = glm::vec3(0, 0, 10.f);
+        glm::mat4 camPosMatrix = glm::translate(identity_matrix4, camPos * -1.f);
+
+        glm::vec3 worldUp = glm::normalize(glm::vec3(0, 1.f, 0));
+        glm::vec3 camCenter = glm::vec3(x_mod, 3.f, 0);
+        glm::vec3 F = glm::normalize(camCenter - camPos);
+        glm::vec3 R = glm::normalize(glm::cross(F, worldUp));
+        glm::vec3 U = glm::normalize(glm::cross(R, F));
+
+        glm::mat4 camOrientation = glm::mat4(1.0f);
+        camOrientation[0][0] = R.x;
+        camOrientation[1][0] = R.y;
+        camOrientation[2][0] = R.z;
+        camOrientation[0][1] = U.x;
+        camOrientation[1][1] = U.y;
+        camOrientation[2][1] = U.z;
+        camOrientation[0][2] = -F.x;
+        camOrientation[1][2] = -F.y;
+        camOrientation[2][2] = -F.z;
+
+        glm::mat4 viewMatrix = camOrientation * camPosMatrix;
+        //glm::mat4 viewMatrix = glm::lookAt(camPos, camCenter, worldUp);
+
+
         // calculate traansformation and projection
         glm::mat4 transformation_matrix = glm::mat4(1.0f);
         glm::mat4 input_translation_matrix = glm::translate(identity_matrix4, glm::vec3(x_mod, y_mod, z_mod));
 
-        transformation_matrix *= input_translation_matrix; // assume current position of object
+        transformation_matrix *= input_translation_matrix; // assume current position of object, then calculate transformation on that position
         transformation_matrix = glm::translate(transformation_matrix, glm::vec3(0, 0, -5.f));
         transformation_matrix = glm::rotate(transformation_matrix, glm::radians(theta), glm::normalize(glm::vec3(0, 1, 0)));
         transformation_matrix = glm::rotate(transformation_matrix, glm::radians(gamma), glm::normalize(glm::vec3(1, 0, 0)));
         transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale, scale, scale));
-        transformation_matrix *= glm::inverse(input_translation_matrix); // bring back to origin
+        transformation_matrix *= glm::inverse(input_translation_matrix); // bring back to origin, revert the initial translation
 
         perspectiveProjection = glm::perspective(glm::radians(fov), height / width, 0.1f, 100.f);
 
 
         // apply changes
-        unsigned int xLoc = glGetUniformLocation(shaderProgram, "x");
-        glUniform1f(xLoc, x_mod);
+        //unsigned int xLoc = glGetUniformLocation(shaderProgram, "x");
+        //glUniform1f(xLoc, x_mod);
 
         unsigned int yLoc = glGetUniformLocation(shaderProgram, "y");
         glUniform1f(yLoc, y_mod);
@@ -305,6 +330,9 @@ int main(void)
 
         unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
+
+        unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
 
         unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));

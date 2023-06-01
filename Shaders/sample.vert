@@ -6,11 +6,12 @@ uniform float x;
 uniform float y;
 uniform float z;
 uniform mat4 transform;
+uniform mat4 view;
 uniform mat4 projection;
 
 
 void main()
 {
 	vec3 newPos = vec3(aPos.x + x, aPos.y + y, aPos.z + z);
-	gl_Position = projection * transform * vec4(newPos, 1.0);
+	gl_Position = projection * view * transform * vec4(newPos, 1.0);
 }
