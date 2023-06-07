@@ -22,7 +22,7 @@
 float x_mod = 0;
 float y_mod = 0;
 float z_mod = 0;
-float scale = 5;
+float scale = 7.5f;
 
 // rotation
 float theta = 0;
@@ -33,12 +33,12 @@ bool up = true;
 bool forward = true;
 
 // transformation and projection
-float fov = 60.f;
-float width = 640;
-float height = 640;
+float fov = 75.f;
+float width = 600;
+float height = 600;
 glm::mat3 identity_matrix3 = glm::mat3(1.0f);
 glm::mat4 identity_matrix4 = glm::mat4(1.0f);
-glm::mat4 orthoProjection = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, -1.0f, 1.0f);
+//glm::mat4 orthoProjection = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, -1.0f, 1.0f);
 glm::mat4 perspectiveProjection = glm::perspective(glm::radians(fov), height / width, 0.1f, 100.f);
 #pragma endregion
 
@@ -135,11 +135,11 @@ void AutoRotateInputs(int key, int action)
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 {
-    TranslationInputs(key, action);
+    /*TranslationInputs(key, action);
     RotationInputs(key, action);
     ScaleInputs(key, action);
     ZoomInputs(key, action);
-    AutoRotateInputs(key, action);
+    AutoRotateInputs(key, action);*/
 }
 #pragma endregion
 
@@ -219,26 +219,14 @@ int main(void)
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
     std::vector<GLuint> mesh_indices;
+    /*std::vector<GLuint> mesh2_indices;
+    std::vector<GLuint> mesh3_indices;*/
 
     LoadObject(attributes, shapes, materials, "3D/bunny.obj");
     for (auto index : shapes[0].mesh.indices)
     {
         mesh_indices.push_back(index.vertex_index);
     }
-
-
-    // define vertices and indices of triangle
-    GLfloat vertices[]
-    {
-        0.f, 0.5f, 0.f,
-        -0.5f, -0.5f, 0.f,
-        0.5f, -0.5f, 0.f
-    };
-
-    GLuint indices[]
-    {
-        0, 1, 2
-    };
 
 
     // Declare buffer objects
@@ -249,99 +237,170 @@ int main(void)
 
     // Setup the buffer objects
     glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER,
-        sizeof(GL_FLOAT) * attributes.vertices.size(),
-        &attributes.vertices[0],
-        GL_STATIC_DRAW);
+                 sizeof(GL_FLOAT) * attributes.vertices.size(),
+                 &attributes.vertices[0],
+                 GL_STATIC_DRAW);
 
     glVertexAttribPointer(0,
-        3,
-        GL_FLOAT,
-        GL_FALSE,
-        3 * sizeof(GL_FLOAT),
-        (void*)0);
+                          3,
+                          GL_FLOAT,
+                          GL_FALSE,
+                          3 * sizeof(GL_FLOAT),
+                          (void*)0);
+
     glEnableVertexAttribArray(0);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-        sizeof(GLuint) * mesh_indices.size(),
-        mesh_indices.data(),
-        GL_STATIC_DRAW);
+                 sizeof(GLuint) * mesh_indices.size(),
+                 mesh_indices.data(),
+                 GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+    glBindVertexArray(0);
+    glBindVertexArray(0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
 
     while (!glfwWindowShouldClose(window))
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
         // camera
-        glm::vec3 camPos = glm::vec3(0, 0, 10.f);
-        glm::mat4 camPosMatrix = glm::translate(identity_matrix4, camPos * -1.f);
-
+        glm::vec3 camPos = glm::vec3(0, 0, 1.f);
+        glm::mat4 camPosMatrix = glm::translate(identity_matrix4, -camPos);
+        glm::vec3 worldForward = glm::normalize(glm::vec3(0, 0, 1.f));
         glm::vec3 worldUp = glm::normalize(glm::vec3(0, 1.f, 0));
-        glm::vec3 camCenter = glm::vec3(x_mod, 3.f, 0);
-        glm::vec3 F = glm::normalize(camCenter - camPos);
-        glm::vec3 R = glm::normalize(glm::cross(F, worldUp));
-        glm::vec3 U = glm::normalize(glm::cross(R, F));
+        glm::vec3 worldRight = glm::normalize(glm::vec3(1.f, 0, 0));
 
-        glm::mat4 camOrientation = glm::mat4(1.0f);
-        camOrientation[0][0] = R.x;
-        camOrientation[1][0] = R.y;
-        camOrientation[2][0] = R.z;
-        camOrientation[0][1] = U.x;
-        camOrientation[1][1] = U.y;
-        camOrientation[2][1] = U.z;
-        camOrientation[0][2] = -F.x;
-        camOrientation[1][2] = -F.y;
-        camOrientation[2][2] = -F.z;
+        {
+            glm::vec3 color = glm::vec3(1, 0, 0);
 
-        glm::mat4 viewMatrix = camOrientation * camPosMatrix;
-        //glm::mat4 viewMatrix = glm::lookAt(camPos, camCenter, worldUp);
+            glm::vec3 camCenter = camPos + glm::vec3(0, -1, 0);
+            glm::vec3 F = glm::normalize(camCenter - camPos);
+            glm::vec3 U = glm::normalize(glm::cross(F, worldRight));
+            glm::vec3 R = glm::normalize(glm::cross(U, F));
 
+            glm::mat4 camOrientation = glm::mat4(1.0f);
+            camOrientation[0][0] = R.x;
+            camOrientation[1][0] = R.y;
+            camOrientation[2][0] = R.z;
+            camOrientation[0][1] = U.x;
+            camOrientation[1][1] = U.y;
+            camOrientation[2][1] = U.z;
+            camOrientation[0][2] = -F.x;
+            camOrientation[1][2] = -F.y;
+            camOrientation[2][2] = -F.z;
+            glm::mat4 viewMatrix = camOrientation * camPosMatrix;
 
-        // calculate traansformation and projection
-        glm::mat4 transformation_matrix = glm::mat4(1.0f);
-        glm::mat4 input_translation_matrix = glm::translate(identity_matrix4, glm::vec3(x_mod, y_mod, z_mod));
-
-        transformation_matrix *= input_translation_matrix; // assume current position of object, then calculate transformation on that position
-        transformation_matrix = glm::translate(transformation_matrix, glm::vec3(0, 0, -5.f));
-        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(theta), glm::normalize(glm::vec3(0, 1, 0)));
-        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(gamma), glm::normalize(glm::vec3(1, 0, 0)));
-        transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale, scale, scale));
-        transformation_matrix *= glm::inverse(input_translation_matrix); // bring back to origin, revert the initial translation
-
-        perspectiveProjection = glm::perspective(glm::radians(fov), height / width, 0.1f, 100.f);
+            glm::mat4 transformation_matrix = glm::translate(identity_matrix4, glm::vec3(-2.f, -5.f, 2.f));
+            transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale));
 
 
-        // apply changes
-        //unsigned int xLoc = glGetUniformLocation(shaderProgram, "x");
-        //glUniform1f(xLoc, x_mod);
+            unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
 
-        unsigned int yLoc = glGetUniformLocation(shaderProgram, "y");
-        glUniform1f(yLoc, y_mod);
+            unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
+            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
 
-        //unsigned int zLoc = glGetUniformLocation(shaderProgram, "z");
-        //glUniform1f(zLoc, z_mod);
+            unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
+            glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
 
-        unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
-
-        unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
-
-        unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
+            unsigned int colorShader = glGetUniformLocation(shaderProgram, "newColor");
+            glUniform3fv(colorShader, 1, glm::value_ptr(color));
 
 
-        glUseProgram(shaderProgram);
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+            glUseProgram(shaderProgram);
+            glBindVertexArray(VAO);
+            glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+        }
 
+        {
+            glm::vec3 color = glm::vec3(0, 1, 0);
+
+            glm::vec3 camCenter = camPos + glm::vec3(-1.f, 0, 0);
+            glm::vec3 F = glm::normalize(camCenter - camPos);
+            glm::vec3 R = glm::normalize(glm::cross(F, worldUp));
+            glm::vec3 U = glm::normalize(glm::cross(R, F));
+
+            glm::mat4 camOrientation = glm::mat4(1.0f);
+            camOrientation[0][0] = R.x;
+            camOrientation[1][0] = R.y;
+            camOrientation[2][0] = R.z;
+            camOrientation[0][1] = U.x;
+            camOrientation[1][1] = U.y;
+            camOrientation[2][1] = U.z;
+            camOrientation[0][2] = -F.x;
+            camOrientation[1][2] = -F.y;
+            camOrientation[2][2] = -F.z;
+            glm::mat4 viewMatrix = camOrientation * camPosMatrix;
+
+            glm::mat4 transformation_matrix = glm::translate(identity_matrix4, glm::vec3(-5.f, 1.f, 0.f));
+            transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale));
+
+
+            unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
+
+            unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
+            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+
+            unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
+            glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
+
+            unsigned int colorShader = glGetUniformLocation(shaderProgram, "newColor");
+            glUniform3fv(colorShader, 1, glm::value_ptr(color));
+
+
+            glUseProgram(shaderProgram);
+            glBindVertexArray(VAO);
+            glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+        }
+
+        {
+            glm::vec3 color = glm::vec3(0, 0, 1);
+
+            glm::vec3 camCenter = camPos + glm::vec3(0, 0, 1);
+            glm::vec3 F = glm::normalize(camCenter - camPos);
+            glm::vec3 R = glm::normalize(glm::cross(F, worldUp));
+            glm::vec3 U = glm::normalize(glm::cross(R, F));
+
+            glm::mat4 camOrientation = glm::mat4(1.0f);
+            camOrientation[0][0] = R.x;
+            camOrientation[1][0] = R.y;
+            camOrientation[2][0] = R.z;
+            camOrientation[0][1] = U.x;
+            camOrientation[1][1] = U.y;
+            camOrientation[2][1] = U.z;
+            camOrientation[0][2] = -F.x;
+            camOrientation[1][2] = -F.y;
+            camOrientation[2][2] = -F.z;
+            glm::mat4 viewMatrix = camOrientation * camPosMatrix;
+
+            glm::mat4 transformation_matrix = glm::translate(identity_matrix4, glm::vec3(0.f, -1.5f, 5.f));
+            transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale));
+
+
+            unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
+
+            unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
+            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+
+            unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
+            glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
+
+            unsigned int colorShader = glGetUniformLocation(shaderProgram, "newColor");
+            glUniform3fv(colorShader, 1, glm::value_ptr(color));
+
+
+            glUseProgram(shaderProgram);
+            glBindVertexArray(VAO);
+            glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
