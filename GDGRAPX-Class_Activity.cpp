@@ -1,5 +1,6 @@
 //#define _USE_MATH_DEFINES
 //#define TINYOBJLOADER_IMPLEMENTATION
+//#define STB_IMAGE_IMPLEMENTATION
 //
 //#include "OpenGL.h"
 //
@@ -18,7 +19,7 @@
 //
 //    glfwSetKeyCallback(opengl->window, KeyCallback);
 //    opengl->SetupShaders();
-//    opengl->SetupObjects();
+//    opengl->SetupObjectsAndTextures();
 //    opengl->Run();
 //    opengl->Cleanup();
 //    glfwTerminate();

@@ -1,11 +1,13 @@
 #pragma once
 
 #include "tiny_obj_loader.h"
+#include "stb_image.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
 #include <string>
 #include <cmath>
 #include <fstream>
@@ -19,7 +21,7 @@ public:
 	void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod);
 	bool SetupOpenGL();
 	void SetupShaders();
-	void SetupObjects();
+	void SetupObjectsAndTextures();
 	void Run();
 	void Cleanup();
 
@@ -52,15 +54,17 @@ private:
 	std::vector<GLuint> mesh_indices;
 
 	// buffer objects
+	GLuint texture;
 	GLuint VAO;
 	GLuint VBO;
 	GLuint EBO;
+	GLuint VBO_UV;
 
 	// translation and scale
 	float x_mod = 0;
 	float y_mod = 0;
 	float z_mod = 0;
-	float scale = 5;
+	float scale = 1.2f;
 
 	// rotation
 	float theta = 0;
@@ -72,8 +76,8 @@ private:
 
 	// transformation and projection
 	float fov = 60.f;
-	float width = 640;
-	float height = 640;
+	float width = 600;
+	float height = 600;
 	glm::mat3 identity_matrix3 = glm::mat3(1.0f);
 	glm::mat4 identity_matrix4 = glm::mat4(1.0f);
 	glm::mat4 orthoProjection = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, -1.0f, 1.0f);

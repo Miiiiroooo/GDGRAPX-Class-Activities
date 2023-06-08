@@ -147,15 +147,43 @@ void OpenGL::SetupShaders()
     glLinkProgram(shaderProgram);
 }
 
-void OpenGL::SetupObjects()
+void OpenGL::SetupObjectsAndTextures()
 {
     // Load 3d object
-    LoadObject(attributes, shapes, materials, "3D/bunny.obj");
+    LoadObject(attributes, shapes, materials, "3D/myCube.obj");
     for (auto index : shapes[0].mesh.indices)
     {
         mesh_indices.push_back(index.vertex_index);
     }
 
+    // Load textures
+    int img_width;
+    int img_height;
+    int colorChannels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* tex_bytes = stbi_load("3D/ayaya.png", &img_width, &img_height, &colorChannels, 0);
+
+    GLfloat UV[]{
+        0.f, 1.f,
+        0.f, 0.f,
+        1.f, 1.f,
+        1.f, 0.f,
+        1.f, 1.f,
+        1.f, 0.f,
+        0.f, 1.f,
+        0.f, 0.f
+    };
+
+    glGenTextures(1, &texture);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img_width, img_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tex_bytes);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    stbi_image_free(tex_bytes);
+    glEnable(GL_DEPTH_TEST);
 
     // define vertices and indices of triangle
     GLfloat vertices[]
@@ -174,6 +202,7 @@ void OpenGL::SetupObjects()
     // Declare buffer objects
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
+    glGenBuffers(1, &VBO_UV);
     glGenBuffers(1, &EBO);
 
     // Setup the buffer objects
@@ -199,6 +228,21 @@ void OpenGL::SetupObjects()
                  mesh_indices.data(),
                  GL_STATIC_DRAW);
 
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_UV);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(GLfloat) * (sizeof(UV) / sizeof(UV[0])),
+                 &UV[0],
+                 GL_STATIC_DRAW);
+
+    glVertexAttribPointer(2,
+                          2,
+                          GL_FLOAT,
+                          GL_FALSE,
+                          2 * sizeof(float),
+                          (void*)0);
+    glEnableVertexAttribArray(2);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -236,42 +280,57 @@ void OpenGL::Run()
 {
     while (!glfwWindowShouldClose(window))
     {
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-        glm::mat4 transformation_matrix = glm::mat4(1.0f);
-        glm::mat4 translation_matrix = glm::translate(identity_matrix4, glm::vec3(x_mod, y_mod, z_mod));
+        // camera
+        glm::vec3 camPos = glm::vec3(0, 0, 0.f);
+        glm::mat4 camPosMatrix = glm::translate(identity_matrix4, -camPos);
+        glm::vec3 worldForward = glm::normalize(glm::vec3(0, 0, 1.f));
+        glm::vec3 worldUp = glm::normalize(glm::vec3(0, 1.f, 0));
+        glm::vec3 worldRight = glm::normalize(glm::vec3(1.f, 0, 0));
 
-        transformation_matrix *= translation_matrix; // assume current position of object
-        transformation_matrix = glm::translate(transformation_matrix, glm::vec3(0, 0, -5.f));
-        transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale, scale, scale));
-        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(theta), glm::normalize(glm::vec3(0, 1, 0)));
-        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(gamma), glm::normalize(glm::vec3(1, 0, 0)));
-        transformation_matrix *= glm::inverse(translation_matrix); // bring back to origin
+        {
+            glm::vec3 camCenter = camPos + glm::vec3(0, 0, 1);
+            glm::vec3 F = glm::normalize(camCenter - camPos);
+            glm::vec3 R = glm::normalize(glm::cross(F, worldUp));
+            glm::vec3 U = glm::normalize(glm::cross(R, F));
 
-        perspectiveProjection = glm::perspective(glm::radians(fov), height / width, 0.1f, 100.f);
+            glm::mat4 camOrientation = glm::mat4(1.0f);
+            camOrientation[0][0] = R.x;
+            camOrientation[1][0] = R.y;
+            camOrientation[2][0] = R.z;
+            camOrientation[0][1] = U.x;
+            camOrientation[1][1] = U.y;
+            camOrientation[2][1] = U.z;
+            camOrientation[0][2] = -F.x;
+            camOrientation[1][2] = -F.y;
+            camOrientation[2][2] = -F.z;
+            glm::mat4 viewMatrix = camOrientation * camPosMatrix;
 
-
-        unsigned int xLoc = glGetUniformLocation(shaderProgram, "x");
-        glUniform1f(xLoc, x_mod);
-
-        unsigned int yLoc = glGetUniformLocation(shaderProgram, "y");
-        glUniform1f(yLoc, y_mod);
-
-        //unsigned int zLoc = glGetUniformLocation(shaderProgram, "z");
-        //glUniform1f(zLoc, z_mod);
-
-        unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
-
-        unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
+            glm::mat4 transformation_matrix = glm::translate(identity_matrix4, glm::vec3(0.f, 1.f, 7.f));
+            transformation_matrix = glm::rotate(transformation_matrix, glm::radians(theta), glm::normalize(glm::vec3(0.f, 1.f, 0.f)));
+            transformation_matrix = glm::rotate(transformation_matrix, glm::radians(gamma), glm::normalize(glm::vec3(1.f, 0.f, 0.f)));
+            transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale));
 
 
-        glUseProgram(shaderProgram);
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+            unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
 
+            unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
+            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+
+            unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
+            glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
+
+            GLuint tex0Address = glGetUniformLocation(shaderProgram, "tex0");
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glUniform1i(tex0Address, 0);
+
+            glUseProgram(shaderProgram);
+            glBindVertexArray(VAO);
+            glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -282,5 +341,6 @@ void OpenGL::Cleanup()
 {
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &VBO_UV);
     glDeleteBuffers(1, &EBO);
 }

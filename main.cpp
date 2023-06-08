@@ -6,6 +6,7 @@
 
 #include "tiny_obj_loader.h"
 #include "stb_image.h"
+#include "Model3D.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -14,25 +15,25 @@
 
 #include <string>
 #include <cmath>
+#include <vector>
 #include <fstream>
 #include <sstream>
 #include <iostream>
 
 
 #pragma region Global Variables
+std::vector<Model3D> modelsList;
+
 // translation and scale
 float x_mod = 0;
 float y_mod = 0;
 float z_mod = 0;
-float scale = 1.2f;
+float scale = 1.f;
 
 // rotation
 float theta = 0;
 float gamma = 0;
 float beta = 0;
-bool right = true;
-bool up = true;
-bool forward = true;
 
 // transformation and projection
 float fov = 75.f;
@@ -40,7 +41,6 @@ float width = 600;
 float height = 600;
 glm::mat3 identity_matrix3 = glm::mat3(1.0f);
 glm::mat4 identity_matrix4 = glm::mat4(1.0f);
-//glm::mat4 orthoProjection = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, -1.0f, 1.0f);
 glm::mat4 perspectiveProjection = glm::perspective(glm::radians(fov), height / width, 0.1f, 100.f);
 #pragma endregion
 
@@ -91,57 +91,18 @@ void RotationInputs(int key, int action)
     }
 }
 
-void ScaleInputs(int key, int action)
+void SpawnModel(int key, int action)
 {
-    if (key == GLFW_KEY_Q && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    if (key = GLFW_KEY_SPACE && action == GLFW_PRESS)
     {
-        scale -= 0.1f;
-    }
-
-    if (key == GLFW_KEY_E && (action == GLFW_PRESS || action == GLFW_REPEAT))
-    {
-        scale += 0.1f;
+        //spawn
     }
 }
-
-void ZoomInputs(int key, int action)
-{
-    if (key == GLFW_KEY_Z && (action == GLFW_PRESS || action == GLFW_REPEAT))
-    {
-        fov -= 1.f;
-    }
-
-    if (key == GLFW_KEY_X && (action == GLFW_PRESS || action == GLFW_REPEAT))
-    {
-        fov += 1.f;
-    }
-}
-
-//void AutoRotateInputs(int key, int action)
-//{
-//    if (key == GLFW_KEY_R && action == GLFW_PRESS)
-//    {
-//        right = !right;
-//    }
-//
-//    if (key == GLFW_KEY_T && action == GLFW_PRESS)
-//    {
-//        up = !up;
-//    }
-//
-//    if (key == GLFW_KEY_Y && action == GLFW_PRESS)
-//    {
-//        forward = !forward;
-//    }
-//}
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 {
-    //TranslationInputs(key, action);
+    TranslationInputs(key, action);
     RotationInputs(key, action);
-    //ScaleInputs(key, action);
-    //ZoomInputs(key, action);
-    //AutoRotateInputs(key, action);
 }
 #pragma endregion
 
@@ -221,8 +182,6 @@ int main(void)
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
     std::vector<GLuint> mesh_indices;
-    /*std::vector<GLuint> mesh2_indices;
-    std::vector<GLuint> mesh3_indices;*/
 
     LoadObject(attributes, shapes, materials, "3D/myCube.obj");
     for (auto index : shapes[0].mesh.indices)
@@ -230,41 +189,10 @@ int main(void)
         mesh_indices.push_back(index.vertex_index);
     }
 
-    // Load textures
-    int img_width;
-    int img_height;
-    int colorChannels;
-    stbi_set_flip_vertically_on_load(true);
-    unsigned char* tex_bytes = stbi_load("3D/ayaya.png", &img_width, &img_height, &colorChannels, 0);
-
-    GLfloat UV[]{
-        0.f, 1.f,
-        0.f, 0.f,
-        1.f, 1.f,
-        1.f, 0.f,
-        1.f, 1.f,
-        1.f, 0.f,
-        0.f, 1.f,
-        0.f, 0.f
-    };
-
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img_width, img_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tex_bytes);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    stbi_image_free(tex_bytes);
-    glEnable(GL_DEPTH_TEST);
-
     // Declare buffer objects
-    GLuint VAO, VBO, EBO, VBO_UV;
+    GLuint VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
-    glGenBuffers(1, &VBO_UV);
     glGenBuffers(1, &EBO);
 
     // Setup the buffer objects
@@ -290,28 +218,13 @@ int main(void)
                  mesh_indices.data(),
                  GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_UV);
-    glBufferData(GL_ARRAY_BUFFER, 
-                 sizeof(GLfloat) * (sizeof(UV) / sizeof(UV[0])), 
-                 &UV[0], 
-                 GL_STATIC_DRAW);
-
-    glVertexAttribPointer(2, 
-                          2, 
-                          GL_FLOAT, 
-                          GL_FALSE, 
-                          2 * sizeof(float), 
-                          (void*)0);
-    glEnableVertexAttribArray(2);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     while (!glfwWindowShouldClose(window))
     {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
         // camera
         glm::vec3 camPos = glm::vec3(0, 0, 0.f);
@@ -353,10 +266,6 @@ int main(void)
             unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
             glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
 
-            GLuint tex0Address = glGetUniformLocation(shaderProgram, "tex0");
-            glBindTexture(GL_TEXTURE_2D, texture);
-            glUniform1i(tex0Address, 0);
-
             glUseProgram(shaderProgram);
             glBindVertexArray(VAO);
             glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
@@ -369,7 +278,6 @@ int main(void)
 
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &VBO_UV);
     glDeleteBuffers(1, &EBO);
     glfwTerminate();
 
