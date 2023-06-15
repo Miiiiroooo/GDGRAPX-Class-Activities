@@ -1,35 +1,25 @@
 #pragma once
-
-struct Vec3f
-{
-	float x;
-	float y;
-	float z;
-
-	Vec3f()
-	{
-		this->x = 0;
-		this->y = 0;
-		this->z = 0;
-	}
-
-	Vec3f(float x, float y, float z)
-	{
-		this->x = x;
-		this->y = y;
-		this->z = z;
-	}
-};
+#include <glad/glad.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 class Model3D
 {
 public:
 	Model3D();
-	void Draw();
+	void Draw(const GLuint& shaderProgram, const glm::mat4& identity_matrix4);
+	void SetPosition(const glm::vec3& position);
+	void SetRotation(const glm::vec3& rotation);
+	void SetScale(const float& scale);
+
+	glm::vec3 GetPosition();
+	glm::vec3 GetRotation();
+	glm::vec3 GetScale();
 
 private:
-	Vec3f position;
-	Vec3f rotation;
-	Vec3f scale;
+	glm::vec3 position;
+	glm::vec3 rotation;
+	glm::vec3 scale;
 };
 

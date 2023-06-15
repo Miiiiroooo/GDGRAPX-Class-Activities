@@ -18,5 +18,5 @@ void main()
 	vec3 newPos = vec3(aPos.x + x, aPos.y + y, aPos.z + z);
 	gl_Position = projection * view * transform * vec4(newPos, 1.0);
 
-	texCoord = aTex;
+	//texCoord = aTex;
 }
