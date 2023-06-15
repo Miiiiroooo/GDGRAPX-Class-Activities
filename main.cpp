@@ -1,5 +1,4 @@
 // GDGRAPX-Class_Activity.cpp : This file contains the 'main' function. Program execution begins and ends there.
-// https://free3d.com/3d-model/low_poly_tree-816203.html
 
 #define _USE_MATH_DEFINES
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -40,19 +39,19 @@ float deltaTime = 0.f;
 float elapsed = 0.f;
 
 // rotation
-float theta = 0;
-float phi = 0;
+float theta = 0.f; // rotation on the x-axis; look up and down
+float phi = 0.f; // rotation on the y-axis; look left and right
 
 // camera
 const float camMovementSpeed = 0.001f; 
-const float camRotationSpeed = 0.05f;
+const float camRotationSpeed = 0.01f;
 glm::vec3 camPos = glm::vec3(0.f);
 glm::vec3 camForward = glm::vec3(0, 0, 1.f);
 glm::vec3 camRight = glm::vec3(1.f, 0, 0);
-std::unordered_map<int, bool> heldKeyInputs;
+std::unordered_map<int, bool> heldKeyInputs; // keeps track of key inputs that are being held down
 
 // mouse
-const float mouseSensitivity = 10.4f;
+const float mouseSensitivity = 25.f;
 glm::vec2 oldCursorPos = glm::vec2(0.f);
 glm::vec2 currentCursorPos = glm::vec2(0.f);
 
@@ -65,7 +64,6 @@ const glm::vec3 worldRight = glm::vec3(1.f, 0, 0);
 float fov = 75.f;
 const float width = 600;
 const float height = 600;
-const glm::mat3 identity_matrix3 = glm::mat3(1.0f);
 const glm::mat4 identity_matrix4 = glm::mat4(1.0f);
 glm::mat4 perspectiveProjection = glm::perspective(glm::radians(fov), height / width, 0.1f, 100.f);
 #pragma endregion
@@ -79,6 +77,7 @@ void RotationInputs();
 void CalculateCameraOrientation();
 void SpawnModel();
 void CheckSpawnCooldown();
+void ResetCooldown();
 
 bool InitializeOpenGL(GLFWwindow** window);
 std::string GetShaderData(std::string path);
@@ -90,11 +89,13 @@ glm::mat4 CreateViewMatrix();
 
 int main(void)
 {
+    // Initialize program 
+    srand(time(0));
     GLFWwindow* window;
     if (!InitializeOpenGL(&window))
         return -1;
 
-    // Load shader files
+    // Load shaders
     std::string vertS = GetShaderData("Shaders/sample.vert");
     const char* v = vertS.c_str();
 
@@ -117,7 +118,7 @@ int main(void)
     std::vector<tinyobj::material_t> materials;
     std::vector<GLuint> mesh_indices;
 
-    if (!LoadObject(attributes, shapes, materials, mesh_indices, "3D/tree.obj"))
+    if (!LoadObject(attributes, shapes, materials, mesh_indices, "3D/tree.obj")) // credits to the obj below
         return -1;
     
 
@@ -155,16 +156,21 @@ int main(void)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     SpawnModel();
+    ResetCooldown();
 
     while (!glfwWindowShouldClose(window))
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
+        // Check inputs
         TranslationInputs();
         RotationInputs();
-        CheckSpawnCooldown(); 
+        CheckSpawnCooldown();
+
+        // Initialize view matrix
         glm::mat4 viewMatrix = CreateViewMatrix();
 
+        // render each model according to the transformation, view, and projection matrices
         for (Model3D model : modelsList)
         {
             model.Draw(shaderProgram, identity_matrix4);
@@ -174,10 +180,6 @@ int main(void)
 
             unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection"); 
             glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection)); 
-
-            glm::vec3 color = glm::vec3(1, 0, 0); 
-            unsigned int colorShader = glGetUniformLocation(shaderProgram, "newColor"); 
-            glUniform3fv(colorShader, 1, glm::value_ptr(color)); 
 
             glUseProgram(shaderProgram); 
             glBindVertexArray(VAO); 
@@ -202,14 +204,14 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 {
     if (action == GLFW_PRESS && (
         key == GLFW_KEY_W || key == GLFW_KEY_S || key == GLFW_KEY_D || key == GLFW_KEY_A ||
-        key == GLFW_KEY_Q || key == GLFW_KEY_E ||
         key == GLFW_KEY_UP || key == GLFW_KEY_DOWN || key == GLFW_KEY_LEFT || key == GLFW_KEY_RIGHT))
     {
+        // Window's press-key-down input has a delay to determine if a key is being pressed down
+        // so I used a hash table instead to remove the delay
         heldKeyInputs[key] = true;
     }
     else if (action == GLFW_RELEASE && (
              key == GLFW_KEY_W || key == GLFW_KEY_S || key == GLFW_KEY_D || key == GLFW_KEY_A ||
-             key == GLFW_KEY_Q || key == GLFW_KEY_E ||
              key == GLFW_KEY_UP || key == GLFW_KEY_DOWN || key == GLFW_KEY_LEFT || key == GLFW_KEY_RIGHT))
     {
         heldKeyInputs[key] = false;
@@ -223,15 +225,19 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 
 void CursorPositionCallback(GLFWwindow* window, double xPos, double yPos)
 {
+    // Get the change in position of the cursor and calculate its direction
     oldCursorPos = currentCursorPos;
     currentCursorPos = glm::vec2(xPos, yPos);
 
     glm::vec2 mouseDir = currentCursorPos - oldCursorPos;
     mouseDir = glm::normalize(mouseDir);
 
+
+    // Use direction to compute the yaw rotation
     phi += mouseDir.x * camRotationSpeed * mouseSensitivity;
     if (phi < -360)
     {
+        // clamps the value of phi within [-360, 360]; unnecessary but helpful for debugging
         phi += 360;
     }
     else if (phi > 360)
@@ -239,9 +245,12 @@ void CursorPositionCallback(GLFWwindow* window, double xPos, double yPos)
         phi -= 360;
     }
 
-    theta -= mouseDir.y * camRotationSpeed * mouseSensitivity;
+
+    // Use direction to compute the pitch rotation
+    theta += mouseDir.y * camRotationSpeed * mouseSensitivity;
     if (theta < -70)
     {
+        // clamps the value of theta within [-70, 70]; this is to prevent the camera from being upside-down if it goes beyond 90 or -90
         theta = -70;
     }
     else if (theta > 70)
@@ -273,22 +282,10 @@ void TranslationInputs()
     {
         camPos -= camRight * camMovementSpeed;
     }
-
-    if (heldKeyInputs[GLFW_KEY_Q])
-    {
-        camPos.y += camMovementSpeed;
-    }
-
-    if (heldKeyInputs[GLFW_KEY_E])
-    {
-        camPos.y -= camMovementSpeed;
-    }
 }
 
 void RotationInputs()
 {
-    bool hasChanged = false;
-
     if (heldKeyInputs[GLFW_KEY_UP])
     {
         theta -= 2.f * camRotationSpeed;
@@ -296,7 +293,8 @@ void RotationInputs()
         {
             theta = -70;
         }
-        hasChanged = true;
+
+        CalculateCameraOrientation(); 
     }
 
     if (heldKeyInputs[GLFW_KEY_DOWN])
@@ -306,7 +304,8 @@ void RotationInputs()
         {
             theta = 70;
         }
-        hasChanged = true;
+
+        CalculateCameraOrientation(); 
     }
 
     if (heldKeyInputs[GLFW_KEY_LEFT])
@@ -316,75 +315,49 @@ void RotationInputs()
         {
             phi += 360;
         }
-        hasChanged = true;
+
+        CalculateCameraOrientation(); 
     }
 
     if (heldKeyInputs[GLFW_KEY_RIGHT])
     {
-        phi += 2.f * camRotationSpeed;
+        phi += 2.f * camRotationSpeed; 
         if (phi > 360)
         {
             phi -= 360;
         }
-        hasChanged = true;
-    }
 
-    if (hasChanged)
-    {
-        CalculateCameraOrientation();
+        CalculateCameraOrientation(); 
     }
 }
 
 void CalculateCameraOrientation()
 {
-   /* float z = std::cos(phi) * std::cos(theta);
-    float x = std::sin(phi) * cos(theta);
-    float y = sin(theta);
+    glm::mat4 pitchRot = glm::rotate(identity_matrix4, glm::radians(theta), worldRight); // look up-down
+    glm::mat4 yawRot = glm::rotate(identity_matrix4, glm::radians(phi), worldUp); // look left-right
 
-    camForward = glm::normalize(glm::vec3(x, y, z)); 
-    camRight = glm::normalize(glm::vec3(z, y, x));*/
+    // apply pitch rotation first before yaw rotation
+    camForward = yawRot * pitchRot * glm::vec4(0.f, 0.f, 1.f, 1.f); 
 
-    glm::vec3 temp1 = camForward;
-    glm::vec3 temp2 = camRight;
-
-    std::cout << "phi: " << phi << " theta: " << theta << "\ninitial camForward: " << camForward.x << " " << camForward.y << " " << camForward.z << "\n";
-
-    glm::mat4 camDirMatrix = glm::rotate(identity_matrix4, glm::radians(theta), glm::normalize(glm::cross(worldUp, camForward)));
-    camDirMatrix = glm::rotate(camDirMatrix, glm::radians(phi), worldUp);
-    camForward = camDirMatrix * glm::vec4(0.f, 0.f, 1.f, 1.f);
-    camRight = camDirMatrix * glm::vec4(1.f, 0.f, 0.f, 1.f);
-
-
-    glm::mat4 testMatrix = glm::rotate(identity_matrix4, glm::radians(-63.f), glm::normalize(glm::cross(worldUp, temp1)));
-    testMatrix = glm::rotate(camDirMatrix, glm::radians(11.f), worldUp);
-    temp1 = testMatrix * glm::vec4(0.f, 0.f, 1.f, 1.f);
-    temp2 = testMatrix * glm::vec4(1.f, 0.f, 0.f, 1.f);
-
-
-    // calculate forward vector using pitch and yaw
-    // https://stackoverflow.com/questions/1568568/how-to-convert-euler-angles-to-directional-vector
-    // https://stackoverflow.com/questions/10569659/camera-pitch-yaw-to-direction-vector
-
-    std::cout << "calculated camForward: " << camForward.x << " " << camForward.y << " " << camForward.z << "\n\n";
-    //std::cout << temp1.x << " " << temp1.y << " " << temp1.z << "\n\n";
+    // pitch rotation does not affect the right vector, so it is removed
+    camRight = yawRot * glm::vec4(1.f, 0.f, 0.f, 1.f);
 }
 
 void SpawnModel()
 {
     if (!isOnCooldown)
     {
+        // Calculate model's position
         glm::vec3 position = camPos + (camForward * spawnDistance);
 
-        glm::vec3 inverseCamForward = glm::inverse(glm::translate(identity_matrix4, camForward)) * glm::vec4(0.f, 0.f, 0.f, 1.f);
-        float yRot = glm::degrees(std::acos(glm::dot(inverseCamForward, worldForward) / glm::length(inverseCamForward))); 
-        yRot *= inverseCamForward.x > 0 ? 1 : -1;
-        glm::vec3 rotation = glm::vec3(0.f, yRot, 0.f);
+        // Calculate model's rotation; only rotate on the y-axis to make it face the camera
+        glm::vec3 rotation = glm::vec3(0.f, phi - 180, 0.f);
 
+        // Create new model and add to the list
         Model3D model;
         model.SetPosition(position);
         model.SetRotation(rotation);
         model.SetScale(scale);
-
         modelsList.push_back(model);
         isOnCooldown = true;
     }
@@ -392,20 +365,26 @@ void SpawnModel()
 
 void CheckSpawnCooldown()
 {
+    // for each game loop, always calculate delta time
+    timeSinceStart = glfwGetTime();
+    deltaTime = timeSinceStart - oldTimeSinceStart;
+    oldTimeSinceStart = timeSinceStart;
+
     if (isOnCooldown)
     {
-        timeSinceStart = glfwGetTime();
-        deltaTime = timeSinceStart - oldTimeSinceStart;
-        oldTimeSinceStart = timeSinceStart;
-
         elapsed += deltaTime;
 
         if (elapsed > spawnCooldown)
         {
-            elapsed = 0.f;
-            isOnCooldown = false;
+            ResetCooldown();
         }
     }
+}
+
+void ResetCooldown()
+{
+    elapsed = 0.f;
+    isOnCooldown = false;
 }
 #pragma endregion
 
@@ -415,6 +394,7 @@ bool InitializeOpenGL(GLFWwindow** window)
     if (!glfwInit())
         return false;
 
+    // Initialize OpenGL
     *window = glfwCreateWindow(width, height, "Aamir Akim", NULL, NULL);
     if (!window)
     {
@@ -426,6 +406,7 @@ bool InitializeOpenGL(GLFWwindow** window)
     gladLoadGL();
     glViewport(0, 0, width, height);
 
+    // Subscribe to user-input events
     glfwSetKeyCallback(*window, KeyCallback);
     glfwSetCursorPosCallback(*window, CursorPositionCallback);
     glfwSetInputMode(*window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -497,3 +478,6 @@ glm::mat4 CreateViewMatrix()
     return camOrientation * camPosMatrix;
 }
 #pragma endregion
+
+
+// Link to the obj file: https://free3d.com/3d-model/low_poly_tree-816203.html
