@@ -221,13 +221,24 @@ int main(void)
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
     std::vector<GLuint> mesh_indices;
-    /*std::vector<GLuint> mesh2_indices;
-    std::vector<GLuint> mesh3_indices;*/
+    std::vector<GLfloat> fullVertexData;
 
     LoadObject(attributes, shapes, materials, "3D/myCube.obj");
     for (auto index : shapes[0].mesh.indices)
     {
         mesh_indices.push_back(index.vertex_index);
+    }
+
+    for (int i = 0; i < shapes[0].mesh.indices.size(); i++)
+    {
+        tinyobj::index_t vData = shapes[0].mesh.indices[i];
+
+        fullVertexData.push_back(attributes.vertices[vData.vertex_index * 3 + 0]);
+        fullVertexData.push_back(attributes.vertices[vData.vertex_index * 3 + 1]);
+        fullVertexData.push_back(attributes.vertices[vData.vertex_index * 3 + 2]);
+
+        fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 0]);
+        fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 1]);
     }
 
     // Load textures
@@ -264,27 +275,36 @@ int main(void)
     GLuint VAO, VBO, EBO, VBO_UV;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
-    glGenBuffers(1, &VBO_UV);
-    glGenBuffers(1, &EBO);
+    /*glGenBuffers(1, &VBO_UV);
+    glGenBuffers(1, &EBO);*/
 
     // Setup the buffer objects
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(GL_FLOAT) * attributes.vertices.size(),
-                 &attributes.vertices[0],
+                 sizeof(GL_FLOAT) * fullVertexData.size(),
+                 fullVertexData.data(),
                  GL_STATIC_DRAW);
 
+
+    GLintptr uvPtr = 3 * sizeof(float); 
     glVertexAttribPointer(0,
                           3,
                           GL_FLOAT,
                           GL_FALSE,
-                          3 * sizeof(GL_FLOAT),
+                          5 * sizeof(GL_FLOAT),
                           (void*)0);
+    glVertexAttribPointer(2,
+                          2,
+                          GL_FLOAT,
+                          GL_FALSE,
+                          5 * sizeof(GL_FLOAT),
+                          (void*)uvPtr); 
     glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(2);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    /*glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                  sizeof(GLuint) * mesh_indices.size(),
                  mesh_indices.data(),
@@ -304,10 +324,10 @@ int main(void)
                           (void*)0);
     glEnableVertexAttribArray(2);
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);*/
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -357,9 +377,11 @@ int main(void)
             glBindTexture(GL_TEXTURE_2D, texture);
             glUniform1i(tex0Address, 0);
 
+
             glUseProgram(shaderProgram);
             glBindVertexArray(VAO);
-            glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+            glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 5);
+            //glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
         }
 
         glfwSwapBuffers(window);
@@ -369,8 +391,8 @@ int main(void)
 
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &VBO_UV);
-    glDeleteBuffers(1, &EBO);
+    //glDeleteBuffers(1, &VBO_UV);
+    //glDeleteBuffers(1, &EBO);
     glfwTerminate();
 
     return 0;
