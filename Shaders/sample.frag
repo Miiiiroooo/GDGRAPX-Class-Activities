@@ -1,14 +1,45 @@
 #version 330 core
 
+// diffuse
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+
+// ambient
+uniform float ambientStr;
+uniform vec3 ambientColor;
+
+// specular
+uniform vec3 camPos;
+uniform float specStr;
+uniform float specPhong;
+
+//texture
 uniform vec3 newColor;
 uniform sampler2D tex0;
 
-out vec4 FragColor;
+
+in vec3 normCoord;
+in vec3 fragPos;
 in vec2 texCoord;
+out vec4 FragColor;
+
 
 void main()
 {
-	//FragColor = vec4(newColor.x, newColor.y, newColor.z, 1.f);
+	vec3 normal = normalize(normCoord);
+	vec3 lightDir = normalize(lightPos - fragPos);
 
-	FragColor = texture(tex0, texCoord);
+	float diff = max(dot(normal, lightDir), 0.0);
+	vec3 diffuse = diff * lightColor;
+
+	vec3 ambientCol = ambientColor * ambientStr;
+
+	vec3 viewDir = normalize(camPos - fragPos);
+	vec3 reflectDir = reflect(-lightDir, normal);
+	float spec = pow(max(dot(reflectDir, viewDir), 0.1), specPhong);
+	vec3 specColor = spec * specStr * lightColor;
+
+	FragColor = vec4(specColor + diffuse + ambientCol, 1.0) * texture(tex0, texCoord);
+	//FragColor = vec4(newColor.x, newColor.y, newColor.z, 1.f);
+	//FragColor = texture(tex0, texCoord);
 }

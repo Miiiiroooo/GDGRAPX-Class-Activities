@@ -36,6 +36,15 @@ glm::vec3 camPos = glm::vec3(0.f);
 glm::vec3 camForward = glm::vec3(0, 0, 1.f);
 glm::vec3 camRight = glm::vec3(1.f, 0, 0);
 
+// light
+glm::vec3 lightPos = glm::vec3(2.f, 7.f, 0.f);
+//glm::vec3 lightColor = glm::vec3(0.5f, 0.8f, 0.97f);
+glm::vec3 lightColor = glm::vec3(1.f);
+float ambientStr = 0.1f;
+glm::vec3 ambientColor = lightColor; // or any color as long as it is below 1
+float specStr = 0.5f;
+float specPhong = 16;
+
 // world orientation
 const glm::vec3 worldForward = glm::vec3(0, 0, 1.f);
 const glm::vec3 worldUp = glm::vec3(0, 1.f, 0);
@@ -66,6 +75,8 @@ bool LoadObject(tinyobj::attrib_t& attributes,
     std::vector<GLfloat>& fullVertexData, 
     std::string path);
 glm::mat4 CreateViewMatrix();
+void ComputeVerticesWithShaders(GLuint& shaderProgram, glm::mat4& transformationMatrix);
+void ComputeFragmentsWithShaders(GLuint& shaderProgram, GLuint& texture);
 #pragma endregion
 
 
@@ -136,8 +147,8 @@ int main(void)
                  fullVertexData.data(),
                  GL_STATIC_DRAW);
 
-    GLintptr uvPtr1 = 3 * sizeof(float);
-    GLintptr uvPtr2 = 6 * sizeof(float);
+    GLintptr normalPtr = 3 * sizeof(float);
+    GLintptr uvPtr = 6 * sizeof(float);
     glVertexAttribPointer(0,
                           3,
                           GL_FLOAT,
@@ -149,13 +160,13 @@ int main(void)
                           GL_FLOAT,
                           GL_FALSE,
                           8 * sizeof(GL_FLOAT),
-                          (void*)uvPtr1);
+                          (void*)normalPtr);
     glVertexAttribPointer(2,
                           2,
                           GL_FLOAT,
                           GL_FALSE,
                           8 * sizeof(GL_FLOAT),
-                          (void*)uvPtr2); 
+                          (void*)uvPtr); 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
@@ -167,24 +178,12 @@ int main(void)
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 viewMatrix = CreateViewMatrix();
+        glm::mat4 transformationMatrix = glm::translate(identity_matrix4, glm::vec3(0.f, 0.f, 4.f));
+        transformationMatrix = glm::rotate(transformationMatrix, glm::radians(theta), glm::normalize(glm::vec3(0.f, 1.f, 0.f)));
+        transformationMatrix = glm::scale(transformationMatrix, glm::vec3(scale));
 
-        glm::mat4 transformation_matrix = glm::translate(identity_matrix4, glm::vec3(0.f, 0.f, 4.f));
-        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(theta), glm::normalize(glm::vec3(0.f, 1.f, 0.f)));
-        transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale));
-
-        unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
-
-        unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
-
-        unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
-
-        GLuint tex0Address = glGetUniformLocation(shaderProgram, "tex0");
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glUniform1i(tex0Address, 0);
+        ComputeVerticesWithShaders(shaderProgram, transformationMatrix);
+        ComputeFragmentsWithShaders(shaderProgram, texture);
 
         theta += 0.8f;
 
@@ -195,7 +194,6 @@ int main(void)
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-
 
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
@@ -360,5 +358,43 @@ glm::mat4 CreateViewMatrix()
     camOrientation[2][2] = -F.z;
 
     return camOrientation * camPosMatrix;
+}
+
+void ComputeVerticesWithShaders(GLuint& shaderProgram, glm::mat4& transformationMatrix)
+{
+    glm::mat4 viewMatrix = CreateViewMatrix();
+
+    unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
+    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformationMatrix));
+
+    unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+
+    unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
+}
+
+void ComputeFragmentsWithShaders(GLuint& shaderProgram, GLuint& texture)
+{
+    GLuint tex0Address = glGetUniformLocation(shaderProgram, "tex0");
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glUniform1i(tex0Address, 0);
+
+    GLuint lightAddress = glGetUniformLocation(shaderProgram, "lightPos");
+    glUniform3fv(lightAddress, 1, glm::value_ptr(lightPos));
+    GLuint lightColorAddress = glGetUniformLocation(shaderProgram, "lightColor");
+    glUniform3fv(lightColorAddress, 1, glm::value_ptr(lightColor));
+
+    GLuint ambientStrAddress = glGetUniformLocation(shaderProgram, "ambientStr");
+    glUniform1f(ambientStrAddress, ambientStr);
+    GLuint ambientColorAddress = glGetUniformLocation(shaderProgram, "ambientColor");
+    glUniform3fv(ambientColorAddress, 1, glm::value_ptr(ambientColor));
+
+    GLuint camPosAddress = glGetUniformLocation(shaderProgram, "camPos");
+    glUniform3fv(camPosAddress, 1, glm::value_ptr(camPos));
+    GLuint specStrAddress = glGetUniformLocation(shaderProgram, "specStr");
+    glUniform1f(specStrAddress, specStr);
+    GLuint specPhongAddress = glGetUniformLocation(shaderProgram, "specPhong");
+    glUniform1f(specPhongAddress, specPhong);
 }
 #pragma endregion
