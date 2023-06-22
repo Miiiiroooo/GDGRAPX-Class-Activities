@@ -186,11 +186,11 @@ int main(void)
         glBindTexture(GL_TEXTURE_2D, texture);
         glUniform1i(tex0Address, 0);
 
-        theta += 0.02f;
+        theta += 0.8f;
 
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 5);
+        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 8);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -319,9 +319,9 @@ bool LoadObject(tinyobj::attrib_t& attributes,
             fullVertexData.push_back(attributes.vertices[vData.vertex_index * 3 + 1]);
             fullVertexData.push_back(attributes.vertices[vData.vertex_index * 3 + 2]);
 
-            fullVertexData.push_back(attributes.vertices[vData.normal_index * 3 + 0]);
-            fullVertexData.push_back(attributes.vertices[vData.normal_index * 3 + 1]);
-            fullVertexData.push_back(attributes.vertices[vData.normal_index * 3 + 2]);
+            fullVertexData.push_back(attributes.normals[vData.normal_index * 3 + 0]);
+            fullVertexData.push_back(attributes.normals[vData.normal_index * 3 + 1]);
+            fullVertexData.push_back(attributes.normals[vData.normal_index * 3 + 2]);
 
             fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 0]);
             fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 1]);
