@@ -17,6 +17,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <time.h>
 
 
 #pragma region Global Variables
@@ -36,14 +37,21 @@ glm::vec3 camPos = glm::vec3(0.f);
 glm::vec3 camForward = glm::vec3(0, 0, 1.f);
 glm::vec3 camRight = glm::vec3(1.f, 0, 0);
 
+// time
+float timeSinceStart = 0.f;
+float oldTimeSinceStart = 0.f;
+float deltaTime = 0.f;
+float elapsed = 0.f;
+
 // light
-glm::vec3 lightPos = glm::vec3(2.f, 7.f, 0.f);
-//glm::vec3 lightColor = glm::vec3(0.5f, 0.8f, 0.97f);
-glm::vec3 lightColor = glm::vec3(1.f);
-float ambientStr = 0.1f;
-glm::vec3 ambientColor = lightColor; // or any color as long as it is below 1
+glm::vec3 lightPos = glm::vec3(0.f, 0.f, 0.f);
+glm::vec3 lightColor = glm::vec3(0.7f, 0.9f, 1.f);
+float ambientStr = 0.01f;
+glm::vec3 ambientColor = lightColor; //or any color as long as it is below 1
+//glm::vec3 ambientColor = glm::vec3(0.5f, 0.8f, 0.97f);
 float specStr = 0.5f;
 float specPhong = 16;
+float pointLightRadius = 10.f;
 
 // world orientation
 const glm::vec3 worldForward = glm::vec3(0, 0, 1.f);
@@ -82,6 +90,7 @@ void ComputeFragmentsWithShaders(GLuint& shaderProgram, GLuint& texture);
 
 int main(void)
 {
+    srand(time(0));
     GLFWwindow* window;
     if (!InitializeOpenGL(&window))
         return -1;
@@ -178,14 +187,18 @@ int main(void)
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 transformationMatrix = glm::translate(identity_matrix4, glm::vec3(0.f, 0.f, 4.f));
+        timeSinceStart = glfwGetTime();
+        deltaTime = timeSinceStart - oldTimeSinceStart;
+        oldTimeSinceStart = timeSinceStart;
+
+        glm::mat4 transformationMatrix = glm::translate(identity_matrix4, glm::vec3(x_mod, 0.f, z_mod + 3.f));
         transformationMatrix = glm::rotate(transformationMatrix, glm::radians(theta), glm::normalize(glm::vec3(0.f, 1.f, 0.f)));
         transformationMatrix = glm::scale(transformationMatrix, glm::vec3(scale));
 
         ComputeVerticesWithShaders(shaderProgram, transformationMatrix);
         ComputeFragmentsWithShaders(shaderProgram, texture);
 
-        theta += 0.8f;
+        theta += 40.0f * deltaTime;
 
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
@@ -208,22 +221,26 @@ void TranslationInputs(int key, int action)
 {
     if (key == GLFW_KEY_D && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
-        x_mod += 0.1f;
+        x_mod += 1.0f;
+        //camPos.x += 0.4f;
     }
 
     if (key == GLFW_KEY_A && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
-        x_mod -= 0.1f;
+        x_mod -= 1.0f;
+        //camPos.x -= 0.4f;
     }
 
     if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
-        y_mod += 0.1f;
+        z_mod += 1.0f;
+        //camPos.z += 0.4f;
     }
 
     if (key == GLFW_KEY_S && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
-        y_mod -= 0.1f;
+        z_mod -= 1.0f;
+        //camPos.z -= 0.4f;
     }
 }
 
@@ -252,7 +269,7 @@ void RotationInputs(int key, int action)
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 {
-    //TranslationInputs(key, action);
+    TranslationInputs(key, action);
     //RotationInputs(key, action);
 }
 #pragma endregion
@@ -396,5 +413,8 @@ void ComputeFragmentsWithShaders(GLuint& shaderProgram, GLuint& texture)
     glUniform1f(specStrAddress, specStr);
     GLuint specPhongAddress = glGetUniformLocation(shaderProgram, "specPhong");
     glUniform1f(specPhongAddress, specPhong);
+
+    float pointLightRadiusAddress = glGetUniformLocation(shaderProgram, "pointLightRadius");
+    glUniform1f(pointLightRadiusAddress, pointLightRadius);
 }
 #pragma endregion
