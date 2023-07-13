@@ -16,7 +16,10 @@ uniform float specStr;
 uniform float specPhong;
 
 // point light
-uniform float pointLightRadius;
+// uniform float pointLightRadius;
+
+// directional light
+uniform vec3 lightDir;
 
 // texture
 uniform vec3 newColor;
@@ -33,7 +36,6 @@ void main()
 {
 	// Get lightDir
 	vec3 normal = normalize(normCoord);
-	vec3 lightDir = normalize(lightPos - fragPos);
 
 	// Compute diffuse
 	float diff = max(dot(normal, lightDir), 0.0);
@@ -48,14 +50,7 @@ void main()
 	float spec = pow(max(dot(reflectDir, viewDir), 0.1), specPhong);
 	vec3 specColor = spec * specStr * lightColor;
 
-	// Compute point light
-	float distanceToLight = length(lightPos - fragPos);
-	float distanceOverRadius = distanceToLight / pointLightRadius;					
-	float pointLightAttenuation = 1 / (1 + pow(7 * distanceOverRadius, 2));			// uses the same formula from Unity's rendering pipeline
-																					// inverse-square law has been modified since point lights should also consider how light is affected by its radius
-																					// since distance can also be 0, we add 1 to denominator to avoid division by 0
-
 	// Apply all
-	vec3 overallLightValue = pointLightAttenuation * (specColor + diffuse + ambientCol);
+	vec3 overallLightValue = (specColor + diffuse + ambientCol);
 	FragColor = vec4(overallLightValue, 1.0) * texture(tex0, texCoord);
 }

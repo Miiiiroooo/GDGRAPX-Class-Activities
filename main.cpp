@@ -45,13 +45,12 @@ float elapsed = 0.f;
 
 // light
 glm::vec3 lightPos = glm::vec3(0.f, 0.f, 0.f);
-glm::vec3 lightColor = glm::vec3(0.7f, 0.9f, 1.f);
-float ambientStr = 0.01f;
-glm::vec3 ambientColor = lightColor; //or any color as long as it is below 1
-//glm::vec3 ambientColor = glm::vec3(0.5f, 0.8f, 0.97f);
+glm::vec3 lightDir = glm::vec3(-1.f, -1.f, 0.f);
+glm::vec3 lightColor = glm::vec3(0.f, 1.f, 0.f);
+float ambientStr = 0.1f;
+glm::vec3 ambientColor = lightColor; 
 float specStr = 0.5f;
 float specPhong = 16;
-float pointLightRadius = 10.f;
 
 // world orientation
 const glm::vec3 worldForward = glm::vec3(0, 0, 1.f);
@@ -59,12 +58,11 @@ const glm::vec3 worldUp = glm::vec3(0, 1.f, 0);
 const glm::vec3 worldRight = glm::vec3(1.f, 0, 0);
 
 // transformation and projection
-float fov = 75.f;
+float fov = 90.f;
 float width = 600;
 float height = 600;
 glm::mat3 identity_matrix3 = glm::mat3(1.0f);
 glm::mat4 identity_matrix4 = glm::mat4(1.0f);
-glm::mat4 orthoProjection = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, -1.0f, 1.0f);
 glm::mat4 perspectiveProjection = glm::perspective(glm::radians(fov), height / width, 0.1f, 100.f);
 #pragma endregion
 
@@ -162,23 +160,23 @@ int main(void)
                           3,
                           GL_FLOAT,
                           GL_FALSE,
-                          8 * sizeof(GL_FLOAT),
+                          6 * sizeof(GL_FLOAT),
                           (void*)0);
     glVertexAttribPointer(1,
                           3,
                           GL_FLOAT,
                           GL_FALSE,
-                          8 * sizeof(GL_FLOAT),
+                          6 * sizeof(GL_FLOAT),
                           (void*)normalPtr);
-    glVertexAttribPointer(2,
+    /*glVertexAttribPointer(2,
                           2,
                           GL_FLOAT,
                           GL_FALSE,
                           8 * sizeof(GL_FLOAT),
-                          (void*)uvPtr); 
+                          (void*)uvPtr);*/ 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
+    //glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -191,7 +189,7 @@ int main(void)
         deltaTime = timeSinceStart - oldTimeSinceStart;
         oldTimeSinceStart = timeSinceStart;
 
-        glm::mat4 transformationMatrix = glm::translate(identity_matrix4, glm::vec3(x_mod, 0.f, z_mod + 3.f));
+        glm::mat4 transformationMatrix = glm::translate(identity_matrix4, glm::vec3(0.f, 0.f, 4.f));
         transformationMatrix = glm::rotate(transformationMatrix, glm::radians(theta), glm::normalize(glm::vec3(0.f, 1.f, 0.f)));
         transformationMatrix = glm::scale(transformationMatrix, glm::vec3(scale));
 
@@ -202,7 +200,7 @@ int main(void)
 
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 8);
+        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 6);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -269,7 +267,7 @@ void RotationInputs(int key, int action)
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 {
-    TranslationInputs(key, action);
+    //TranslationInputs(key, action);
     //RotationInputs(key, action);
 }
 #pragma endregion
@@ -338,8 +336,9 @@ bool LoadObject(tinyobj::attrib_t& attributes,
             fullVertexData.push_back(attributes.normals[vData.normal_index * 3 + 1]);
             fullVertexData.push_back(attributes.normals[vData.normal_index * 3 + 2]);
 
-            fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 0]);
-            fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 1]);
+            // Obj does not have texcoords, uncommenting code below will throw an error
+           /* fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 0]);
+            fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 1]);*/
         }
 
         return true;
@@ -359,9 +358,6 @@ glm::mat4 CreateViewMatrix()
     glm::vec3 F = glm::normalize(camForward);
     glm::vec3 R = glm::normalize(glm::cross(worldUp, F)); 
     glm::vec3 U = glm::normalize(glm::cross(F, R));
-
-    //glm::vec3 R = glm::normalize(glm::cross(F, worldUp)); // original
-    //glm::vec3 U = glm::normalize(glm::cross(R, F));
 
     glm::mat4 camOrientation = glm::mat4(1.0f);
     camOrientation[0][0] = R.x;
@@ -414,7 +410,7 @@ void ComputeFragmentsWithShaders(GLuint& shaderProgram, GLuint& texture)
     GLuint specPhongAddress = glGetUniformLocation(shaderProgram, "specPhong");
     glUniform1f(specPhongAddress, specPhong);
 
-    float pointLightRadiusAddress = glGetUniformLocation(shaderProgram, "pointLightRadius");
-    glUniform1f(pointLightRadiusAddress, pointLightRadius);
+    GLuint lightDirAddress = glGetUniformLocation(shaderProgram, "lightDir");
+    glUniform3fv(lightDirAddress, 1, glm::value_ptr(lightDir));
 }
 #pragma endregion
