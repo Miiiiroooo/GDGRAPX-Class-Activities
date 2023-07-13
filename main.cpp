@@ -44,9 +44,9 @@ float deltaTime = 0.f;
 float elapsed = 0.f;
 
 // light
-glm::vec3 lightPos = glm::vec3(0.f, 0.f, 0.f);
+glm::vec3 lightPos = glm::vec3(0.f, 4.f, 0.f);
 glm::vec3 lightDir = glm::vec3(-1.f, -1.f, 0.f);
-glm::vec3 lightColor = glm::vec3(0.f, 1.f, 0.f);
+glm::vec3 lightColor = glm::vec3(0.9f, 0.9f, 0.9f);
 float ambientStr = 0.1f;
 glm::vec3 ambientColor = lightColor; 
 float specStr = 0.5f;
@@ -81,7 +81,7 @@ bool LoadObject(tinyobj::attrib_t& attributes,
     std::vector<GLfloat>& fullVertexData, 
     std::string path);
 glm::mat4 CreateViewMatrix();
-void ComputeVerticesWithShaders(GLuint& shaderProgram, glm::mat4& transformationMatrix);
+void ComputeVerticesWithShaders(GLuint& shaderProgram, glm::mat4& transformationMatrix, glm::mat4& viewMatrix);
 void ComputeFragmentsWithShaders(GLuint& shaderProgram, GLuint& texture);
 #pragma endregion
 
@@ -100,6 +100,12 @@ int main(void)
     std::string fragS = GetShaderData("Shaders/sample.frag");;
     const char* f = fragS.c_str();
 
+    std::string sky_vertS = GetShaderData("Shaders/skybox.vert");
+    const char* sky_v = sky_vertS.c_str();
+
+    std::string sky_fragS = GetShaderData("Shaders/skybox.frag");;
+    const char* sky_f = sky_fragS.c_str();
+
     // Create and compile shaders
     GLuint vertShader = CreateAndCompileShader(GL_VERTEX_SHADER, v);
     GLuint fragShader = CreateAndCompileShader(GL_FRAGMENT_SHADER, f);
@@ -108,6 +114,14 @@ int main(void)
     glAttachShader(shaderProgram, vertShader);
     glAttachShader(shaderProgram, fragShader);
     glLinkProgram(shaderProgram);
+
+    GLuint sky_vertShader = CreateAndCompileShader(GL_VERTEX_SHADER, sky_v);
+    GLuint sky_fragShader = CreateAndCompileShader(GL_FRAGMENT_SHADER, sky_f);
+
+    GLuint skyboxProgram = glCreateProgram(); 
+    glAttachShader(skyboxProgram, sky_vertShader); 
+    glAttachShader(skyboxProgram, sky_fragShader); 
+    glLinkProgram(skyboxProgram); 
 
 
     // Load 3d object
@@ -139,6 +153,102 @@ int main(void)
     stbi_image_free(tex_bytes);
     glEnable(GL_DEPTH_TEST);
 
+    // Skybox
+    /*
+      7--------6
+     /|       /|
+    4--------5 |
+    | |      | |
+    | 3------|-2
+    |/       |/
+    0--------1
+    */
+    //Vertices for the cube
+    float skyboxVertices[]{
+        -1.f, -1.f, 1.f, //0
+        1.f, -1.f, 1.f,  //1
+        1.f, -1.f, -1.f, //2
+        -1.f, -1.f, -1.f,//3
+        -1.f, 1.f, 1.f,  //4
+        1.f, 1.f, 1.f,   //5
+        1.f, 1.f, -1.f,  //6
+        -1.f, 1.f, -1.f  //7
+    };
+
+    //Skybox Indices
+    unsigned int skyboxIndices[]{
+        1,2,6,
+        6,5,1,
+
+        0,4,7,
+        7,3,0,
+
+        4,5,6,
+        6,7,4,
+
+        0,3,2,
+        2,1,0,
+
+        0,1,5,
+        5,4,0,
+
+        3,7,6,
+        6,2,3
+    };
+
+    unsigned int skyboxVAO, skyboxVBO, skyboxEBO;
+    glGenVertexArrays(1, &skyboxVAO);
+    glGenBuffers(1, &skyboxVBO);
+    glGenBuffers(1, &skyboxEBO);
+    
+    glBindVertexArray(skyboxVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW); 
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GL_FLOAT), (void*)0);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, skyboxEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(skyboxIndices), &skyboxIndices, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+
+    std::string facesSkyboxArray[]{
+        "Skybox/rainbow_rt.png",
+        "Skybox/rainbow_lf.png",
+        "Skybox/rainbow_up.png",
+        "Skybox/rainbow_dn.png",
+        "Skybox/rainbow_ft.png",
+        "Skybox/rainbow_bk.png",
+    };
+
+    unsigned int skyboxTex;
+
+    glGenTextures(1, &skyboxTex);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTex);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    for (unsigned int i = 0; i < 6; i++)
+    {
+        int w, h, sky_color_channel;
+        stbi_set_flip_vertically_on_load(false);
+
+        unsigned char* data = stbi_load(facesSkyboxArray[i].c_str(), &w, &h, &sky_color_channel, 0);
+
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        }
+
+        stbi_image_free(data);
+    }
+
+    stbi_set_flip_vertically_on_load(true);
 
     // Declare buffer objects
     GLuint VAO, VBO;
@@ -160,23 +270,23 @@ int main(void)
                           3,
                           GL_FLOAT,
                           GL_FALSE,
-                          6 * sizeof(GL_FLOAT),
+                          8 * sizeof(GL_FLOAT),
                           (void*)0);
     glVertexAttribPointer(1,
                           3,
                           GL_FLOAT,
                           GL_FALSE,
-                          6 * sizeof(GL_FLOAT),
+                          8 * sizeof(GL_FLOAT),
                           (void*)normalPtr);
-    /*glVertexAttribPointer(2,
+    glVertexAttribPointer(2,
                           2,
                           GL_FLOAT,
                           GL_FALSE,
                           8 * sizeof(GL_FLOAT),
-                          (void*)uvPtr);*/ 
+                          (void*)uvPtr); 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
-    //glEnableVertexAttribArray(2);
+    glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -193,14 +303,38 @@ int main(void)
         transformationMatrix = glm::rotate(transformationMatrix, glm::radians(theta), glm::normalize(glm::vec3(0.f, 1.f, 0.f)));
         transformationMatrix = glm::scale(transformationMatrix, glm::vec3(scale));
 
-        ComputeVerticesWithShaders(shaderProgram, transformationMatrix);
+        glm::mat4 viewMatrix = CreateViewMatrix();
+
+        ComputeVerticesWithShaders(shaderProgram, transformationMatrix, viewMatrix);
         ComputeFragmentsWithShaders(shaderProgram, texture);
 
         theta += 40.0f * deltaTime;
 
+        glDepthMask(GL_FALSE);
+        glDepthFunc(GL_LEQUAL);
+        glUseProgram(skyboxProgram);
+        glm::mat4 sky_view = glm::mat4(1.0f);
+        sky_view = glm::mat4(
+            glm::mat3(viewMatrix)
+        );
+
+        unsigned int skyViewLoc = glGetUniformLocation(skyboxProgram, "view");
+        glUniformMatrix4fv(skyViewLoc, 1, GL_FALSE, glm::value_ptr(sky_view));
+
+        unsigned int skyProjectionLoc = glGetUniformLocation(skyboxProgram, "projection");
+        glUniformMatrix4fv(skyProjectionLoc, 1, GL_FALSE, glm::value_ptr(perspectiveProjection));
+         
+        glBindVertexArray(skyboxVAO);
+        glActiveTexture(0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTex);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glDepthMask(GL_TRUE);
+        glDepthFunc(GL_LESS);
+
+
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 6);
+        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 8);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -336,9 +470,8 @@ bool LoadObject(tinyobj::attrib_t& attributes,
             fullVertexData.push_back(attributes.normals[vData.normal_index * 3 + 1]);
             fullVertexData.push_back(attributes.normals[vData.normal_index * 3 + 2]);
 
-            // Obj does not have texcoords, uncommenting code below will throw an error
-           /* fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 0]);
-            fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 1]);*/
+            fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 0]);
+            fullVertexData.push_back(attributes.texcoords[vData.texcoord_index * 2 + 1]);
         }
 
         return true;
@@ -373,10 +506,8 @@ glm::mat4 CreateViewMatrix()
     return camOrientation * camPosMatrix;
 }
 
-void ComputeVerticesWithShaders(GLuint& shaderProgram, glm::mat4& transformationMatrix)
+void ComputeVerticesWithShaders(GLuint& shaderProgram, glm::mat4& transformationMatrix, glm::mat4& viewMatrix)
 {
-    glm::mat4 viewMatrix = CreateViewMatrix();
-
     unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
     glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformationMatrix));
 
